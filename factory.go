@@ -47,6 +47,8 @@ func (f *Factory) ID() string {
 
 // Sign will sign a Token.
 // It uses the current values in the header and payload, so it is safe to call multiple times.
+// It updates the Token's Algorithm field to match the factory's signer's algorithm.
+// It updates the Token's KeyID field to match the factory's key id.
 func (f *Factory) Sign(t *Token) error {
 	t.isSigned = false // unset the signed flag, just to be safe
 

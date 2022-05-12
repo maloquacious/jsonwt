@@ -26,14 +26,15 @@ package jsonwt
 import "errors"
 
 var ErrBadFactory = errors.New("bad factory")
-var ErrBadRequest = errors.New("bad request")
 var ErrBadToken = errors.New("bad token")
-var ErrExpired = errors.New("expired")
 var ErrInvalid = errors.New("invalid token")
-var ErrInvalidSignature = errors.New("invalid signature")
-var ErrMissingAuthHeader = errors.New("missing auth header")
 var ErrMissingScope = errors.New("missing scope")
-var ErrMissingSigner = errors.New("missing signer")
-var ErrNotBearer = errors.New("not a bearer token")
-var ErrNotMyKID = errors.New("not my kid")
 var ErrUnauthorized = errors.New("unauthorized")
+
+//var ErrBadRequest = errors.New("bad request")
+//var ErrExpired = errors.New("expired")
+//var ErrInvalidSignature = errors.New("invalid signature")
+//var ErrMissingAuthHeader = errors.New("missing auth header")
+//var ErrMissingSigner = errors.New("missing signer")
+//var ErrNotBearer = errors.New("not a bearer token")
+//var ErrNotMyKID = errors.New("not my kid")

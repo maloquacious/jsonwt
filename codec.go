@@ -31,7 +31,6 @@ import (
 
 // Decode expects the data to look like header.payload.signature if it is a valid Token
 func Decode(data string) (*Token, error) {
-	// token should look like header.payload.signature if it is a valid Token
 	sections := strings.Split(data, ".")
 	if len(sections) != 3 || len(sections[0]) == 0 || len(sections[1]) == 0 || len(sections[2]) == 0 {
 		return nil, ErrBadToken

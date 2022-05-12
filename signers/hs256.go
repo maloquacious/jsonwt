@@ -21,14 +21,38 @@
  * SOFTWARE.
  */
 
-package jsonwt
+// Package signers implements jsonwt.Signer types.
+package signers
 
-// Signer interface
-type Signer interface {
-	// Algorithm returns the name of the algorithm used by the signer.
-	// The Factory will set the Token header's "alg" field to this value when it is signed.
-	// Example: "HS256"
-	Algorithm() string
-	// Sign returns a slice containing the signature of the message.
-	Sign(msg []byte) ([]byte, error)
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+)
+
+// HS256 implements the jsonwt.Signer interface using HMAC256.
+type HS256 struct {
+	key []byte
+}
+
+// NewHS256 returns a new HMAC256 signer.
+func NewHS256(secret []byte) (*HS256, error) {
+	s := HS256{key: make([]byte, len(secret))}
+	copy(s.key, secret)
+	return &s, nil
+}
+
+// Algorithm implements the jsonwt.Signer interface.
+// It returns the "name" of the algorithm used for signing messages.
+func (s *HS256) Algorithm() string {
+	return "HS256"
+}
+
+// Sign implements the jsonwt.Signer interface.
+// It returns a slice of bytes containing the signature for the message.
+func (s *HS256) Sign(msg []byte) ([]byte, error) {
+	hm := hmac.New(sha256.New, s.key)
+	if _, err := hm.Write(msg); err != nil {
+		return nil, err
+	}
+	return hm.Sum(nil), nil
 }

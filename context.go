@@ -25,14 +25,6 @@ package jsonwt
 
 import "context"
 
-// key is an unexported type for keys defined in this package.
-// This prevents collisions with keys defined in other packages.
-type key int
-
-// tokenKey is the key for Token values in Cookies and Contexts.
-// It is unexported; clients must use NewContext and FromContext to create and fetch from the context.
-var tokenContextKey key
-
 // NewContext returns a new Context that carries the Token.
 func (t *Token) NewContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, tokenContextKey, t)
@@ -43,3 +35,11 @@ func FromContext(ctx context.Context) (*Token, bool) {
 	t, ok := ctx.Value(tokenContextKey).(*Token)
 	return t, ok
 }
+
+// key is an unexported type for keys defined in this package.
+// This prevents collisions with keys defined in other packages.
+type key int
+
+// tokenKey is the key for Token values in Cookies and Contexts.
+// It is unexported; clients must use NewContext and FromContext to create and fetch from the context.
+var tokenContextKey key
