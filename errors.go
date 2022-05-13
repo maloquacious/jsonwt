@@ -28,7 +28,7 @@ import "errors"
 var ErrBadFactory = errors.New("bad factory")
 var ErrBadToken = errors.New("bad token")
 var ErrInvalid = errors.New("invalid token")
-var ErrMissingScope = errors.New("missing scope")
+var ErrMissingClaim = errors.New("missing claim")
 var ErrUnauthorized = errors.New("unauthorized")
 
 //var ErrBadRequest = errors.New("bad request")

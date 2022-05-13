@@ -31,20 +31,20 @@ import (
 
 // NewToken will return an unsigned Token (the caller must use a Factory to sign the token).
 // `ttl` is the time-to-live for the token.
-// `scope` is the optional private payload for use by the application.
-// If provided, scope will be marshalled to JSON, then base64 encoded.
-func NewToken(ttl time.Duration, scope interface{}) (*Token, error) {
+// `claim` is the optional private payload for use by the application.
+// If provided, claim will be marshalled to JSON, then base64 encoded.
+func NewToken(ttl time.Duration, claim interface{}) (*Token, error) {
 	var t Token
 	t.h.Version = 1
 	t.h.TokenType = "JWT"
 	t.p.IssuedAt = time.Now().Unix()
 	t.p.ExpirationTime = time.Now().Add(ttl).Unix()
-	if scope != nil { // scope is optional.
-		b, err := json.Marshal(scope)
+	if claim != nil { // claim is optional.
+		b, err := json.Marshal(claim)
 		if err != nil {
 			return nil, err
 		}
-		t.p.Scope = encode(b)
+		t.p.Claim = encode(b)
 	}
 	return &t, nil
 }
@@ -80,8 +80,8 @@ type Token struct {
 		IssuedAt int64 `json:"iat,omitempty"`
 		// Case sensitive unique identifier of the token even among different issuers.
 		JWTID string `json:"jti,omitempty"`
-		// Scope is private data for use by the application.
-		Scope string `json:"scope,omitempty"`
+		// Claim is private data for use by the application.
+		Claim string `json:"claim,omitempty"`
 		b64   string // payload marshalled to JSON and then base-64 encoded
 	}
 	s        string // signature base-64 encoded

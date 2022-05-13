@@ -88,13 +88,13 @@ func (f *Factory) Sign(t *Token) error {
 }
 
 // Token is a helper to create a new, signed Token.
-// `scope` is the private application payload to add to the Token
-func (f *Factory) Token(ttl time.Duration, scope interface{}) (*Token, error) {
+// `claim` is the private application payload to add to the Token
+func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
 	if f == nil || f.kid == "" || f.s == nil {
 		return nil, ErrBadFactory
 	}
 
-	t, err := NewToken(ttl, scope)
+	t, err := NewToken(ttl, claim)
 	if err != nil {
 		return nil, err
 	} else if err = f.Sign(t); err != nil {

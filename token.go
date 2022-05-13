@@ -24,7 +24,6 @@ SOFTWARE.
 package jsonwt
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -62,30 +61,28 @@ func (t *Token) DeleteCookie(w http.ResponseWriter) {
 	DeleteCookie(w)
 }
 
+// Header is a helper function
+func (t *Token) Header() string {
+	return t.h.b64
+}
+
+// Payload is a helper function
+func (t *Token) Payload() string {
+	return t.p.b64
+}
+
 // SetCookie associates a cookie with the Token and sends it to the client.
 func (t *Token) SetCookie(w http.ResponseWriter) {
 	SetCookie(w, t)
 }
 
+// Signature is a helper function
+func (t *Token) Signature() string {
+	return t.s
+}
+
 // String implements the Stringer interface.
 // Please don't call this before signing the token.
 func (t *Token) String() string {
-	return t.h.b64 + "." + t.p.b64 + "." + t.s
-}
-
-// Scope retrieves the private payload from the Token and marshals it into the given variable.
-// It returns errors if the Token is not valid, has no private payload, or there's an error unmarshalling the data.
-func (t *Token) Scope(v interface{}) error {
-	if t == nil {
-		return ErrBadToken
-	} else if !t.IsValid() {
-		return ErrInvalid
-	} else if t.p.Scope == "" {
-		return ErrMissingScope
-	}
-	b, err := decode(t.p.Scope)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, v)
+	return t.Header() + "." + t.Payload() + "." + t.Signature()
 }
