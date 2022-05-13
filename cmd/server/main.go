@@ -41,7 +41,8 @@ func main() {
 
 type AUTHRESPONSE struct {
 	Data struct {
-		Token string `json:"token"`
+		Token   string `json:"token"`
+		Version string `json:"version"`
 	} `json:"data"`
 }
 
@@ -76,6 +77,7 @@ func run() error {
 				return
 			}
 			var rsp AUTHRESPONSE
+			rsp.Data.Version = jsonwt.Version()
 			rsp.Data.Token = t.String()
 			b, err := json.MarshalIndent(rsp, "", "  ")
 			if err != nil {
