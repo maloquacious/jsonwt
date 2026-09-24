@@ -35,6 +35,10 @@ token, and extract the claim.
 - [Token format reference](docs/token-format.md)
 - [RFC 7519 differences and hypothetical compliance steps](docs/rfc-7519.md)
 - [Security and design explanation](docs/security.md)
+- [Compatibility policy](docs/compatibility.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Release checklist](docs/releasing.md)
 
 ## License
 
