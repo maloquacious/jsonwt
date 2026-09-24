@@ -19,5 +19,7 @@ The format is JWT-shaped but intentionally custom and is not promised to
 interoperate with general-purpose JWT libraries. The package still rejects
 malformed input, verifies signatures, and enforces token times; those
 correctness properties do not turn it into a production security system.
+See [Differences from RFC 7519](rfc-7519.md) for a standards comparison and the
+hypothetical work compliance would require.
 
 Return to the [tutorial and user manual](tutorial.md).

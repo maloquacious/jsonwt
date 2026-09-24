@@ -8,7 +8,7 @@ jsonwt tokens are JWT-shaped but are not general-purpose JSON Web Tokens. They
 use package-specific fields and encode application claims differently from RFC
 7519. Do not assume that another JWT implementation can issue or consume them.
 The payload and application claim are encoded, not encrypted. See [Security and
-scope](security.md).
+scope](security.md) and [Differences from RFC 7519](rfc-7519.md).
 
 ## Compact layout
 

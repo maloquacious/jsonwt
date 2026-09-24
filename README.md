@@ -33,6 +33,7 @@ token, and extract the claim.
 - [How-to guides](docs/how-to.md)
 - [API reference](https://pkg.go.dev/github.com/mdhender/jsonwt)
 - [Token format reference](docs/token-format.md)
+- [RFC 7519 differences and hypothetical compliance steps](docs/rfc-7519.md)
 - [Security and design explanation](docs/security.md)
 
 ## License
