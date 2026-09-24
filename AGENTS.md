@@ -14,6 +14,10 @@ This repository is a small, dependency-free Go module that implements JSON Web T
 
 Use the Go toolchain installed by `.agents/setup`.
 
+Commit completed work directly to `main` and push it to `origin`. When a GitHub
+issue is completely implemented and all required checks pass, include a closing
+reference such as `Closes #123` in the commit message.
+
 Before completing a change, run:
 
 ```sh

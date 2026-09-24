@@ -28,29 +28,30 @@ import (
 	"time"
 )
 
-// IsValid returns true only if the Token is signed, active, and not expired.
+// IsValid returns true only if the Token is signed, issued, active, and not
+// expired. IssuedAt and NotBefore are inclusive boundaries; ExpirationTime is
+// exclusive.
 func (t *Token) IsValid() bool {
-	now := time.Now().UTC()
+	return t.isValidAt(time.Now().UTC())
+}
+
+func (t *Token) isValidAt(now time.Time) bool {
 	if t == nil {
-		//log.Printf("jwt is nil\n")
 		return false
 	} else if !t.isSigned {
-		//log.Printf("alg %q typ %q signed %v borked\n", j.h.Algorithm, j.h.TokenType, j.isSigned)
 		return false
 	} else if t.p.IssuedAt == 0 {
-		//log.Printf("alg %q typ %q signed %v no issue timestamp\n", j.h.Algorithm, j.h.TokenType, j.isSigned)
 		return false
 	} else if t.p.ExpirationTime == 0 {
-		//log.Printf("alg %q typ %q signed %v no expiration timestamp\n", j.h.Algorithm, j.h.TokenType, j.isSigned)
 		return false
-	} else if !now.After(time.Unix(t.p.IssuedAt, 0)) {
-		//log.Printf("alg %q typ %q signed %v !now.After(issuedAt) %s %s\n", j.h.Algorithm, j.h.TokenType, j.isSigned, now.Format("2006-01-02T15:04:05.99999999Z"), time.Unix(j.p.IssuedAt, 0).Format("2006-01-02T15:04:05.99999999Z"))
+	}
+
+	unixNow := now.Unix()
+	if unixNow < t.p.IssuedAt {
 		return false
-	} else if !time.Unix(t.p.ExpirationTime, 0).After(now) {
-		//log.Printf("alg %q typ %q signed %v !expiresAt.After(now)\n", j.h.Algorithm, j.h.TokenType, j.isSigned)
+	} else if unixNow >= t.p.ExpirationTime {
 		return false
-	} else if t.p.NotBefore != 0 && !now.Before(time.Unix(t.p.NotBefore, 0)) {
-		//log.Printf("alg %q typ %q signed %v !now.Before(notBefore)\n", j.h.Algorithm, j.h.TokenType, j.isSigned)
+	} else if t.p.NotBefore != 0 && unixNow < t.p.NotBefore {
 		return false
 	}
 	return true

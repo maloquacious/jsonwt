@@ -88,7 +88,9 @@ func (f *Factory) Sign(t *Token) error {
 }
 
 // Token is a helper to create a new, signed Token.
-// `claim` is the private application payload to add to the Token
+// ttl must be positive; token timestamps have one-second precision. Token
+// returns ErrInvalid when ttl is zero or negative.
+// `claim` is the private application payload to add to the Token.
 func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
 	if f == nil || f.kid == "" || f.s == nil {
 		return nil, ErrBadFactory

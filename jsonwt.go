@@ -29,16 +29,23 @@ import (
 	"time"
 )
 
-// NewToken will return an unsigned Token (the caller must use a Factory to sign the token).
-// `ttl` is the time-to-live for the token.
+// NewToken returns an unsigned Token (the caller must use a Factory to sign the token).
+// ttl is the time-to-live for the token and must be positive. Token timestamps
+// have one-second precision, so callers should use a ttl of at least one second.
+// NewToken returns ErrInvalid when ttl is zero or negative.
 // `claim` is the optional private payload for use by the application.
 // If provided, claim will be marshalled to JSON, then base64 encoded.
 func NewToken(ttl time.Duration, claim interface{}) (*Token, error) {
+	if ttl <= 0 {
+		return nil, ErrInvalid
+	}
+
+	now := time.Now().UTC()
 	var t Token
 	t.h.Version = 1
 	t.h.TokenType = "JWT"
-	t.p.IssuedAt = time.Now().Unix()
-	t.p.ExpirationTime = time.Now().Add(ttl).Unix()
+	t.p.IssuedAt = now.Unix()
+	t.p.ExpirationTime = now.Add(ttl).Unix()
 	if claim != nil { // claim is optional.
 		b, err := json.Marshal(claim)
 		if err != nil {
