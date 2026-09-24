@@ -21,7 +21,9 @@
  * SOFTWARE.
  */
 
-// Package main implements a server for testing the JSONWT API.
+// Package main implements a non-production server for testing the JSONWT API.
+// It uses a public, embedded secret and must not be used for authentication or
+// copied into deployed software.
 package main
 
 import (
@@ -56,6 +58,7 @@ func run() error {
 		return err
 	}
 	f := jsonwt.NewFactory("me", s)
+	log.Printf("WARNING: non-production example server; do not expose or deploy\n")
 	log.Printf("using factory %q\n", f.ID())
 
 	claim := claimData{
