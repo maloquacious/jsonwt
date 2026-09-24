@@ -24,6 +24,7 @@ SOFTWARE.
 package jsonwt
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -46,6 +47,8 @@ func Decode(data string) (*Token, error) {
 	// the header is base64 encoded JSON
 	if rawHeader, err := decode(t.h.b64); err != nil {
 		return nil, fmt.Errorf("%w: header: %v", ErrBadToken, err)
+	} else if !isJSONObject(rawHeader) {
+		return nil, fmt.Errorf("%w: header must be a JSON object", ErrBadToken)
 	} else if err = json.Unmarshal(rawHeader, &t.h); err != nil {
 		return nil, fmt.Errorf("%w: header: %v", ErrBadToken, err)
 	}
@@ -53,6 +56,8 @@ func Decode(data string) (*Token, error) {
 	// the payload is base64 encoded JSON
 	if rawPayload, err := decode(t.p.b64); err != nil {
 		return nil, fmt.Errorf("%w: payload: %v", ErrBadToken, err)
+	} else if !isJSONObject(rawPayload) {
+		return nil, fmt.Errorf("%w: payload must be a JSON object", ErrBadToken)
 	} else if err = json.Unmarshal(rawPayload, &t.p); err != nil {
 		return nil, fmt.Errorf("%w: payload: %v", ErrBadToken, err)
 	}
@@ -68,4 +73,9 @@ func decode(raw string) (b []byte, err error) {
 // encode is a helper function for converting a slice of raw bytes to a string containg the base64 representation
 func encode(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func isJSONObject(b []byte) bool {
+	b = bytes.TrimSpace(b)
+	return len(b) != 0 && b[0] == '{'
 }

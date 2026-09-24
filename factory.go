@@ -42,8 +42,11 @@ type Factory struct {
 	s   Signer
 }
 
-// ID returns the id of the current signer.
+// ID returns the id of the current signer. A nil Factory has an empty id.
 func (f *Factory) ID() string {
+	if f == nil {
+		return ""
+	}
 	return f.kid
 }
 

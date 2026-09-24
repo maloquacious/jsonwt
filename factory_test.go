@@ -44,6 +44,14 @@ func (s testSigner) Sign(msg []byte) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+var errTestSigner = errors.New("test signer error")
+
+type failingSigner struct{}
+
+func (failingSigner) Algorithm() string { return "HS256" }
+
+func (failingSigner) Sign([]byte) ([]byte, error) { return nil, errTestSigner }
+
 func TestFactoryParse(t *testing.T) {
 	f := NewFactory("key-1", testSigner("secret"))
 	token, err := f.Token(time.Hour, struct {
@@ -101,6 +109,7 @@ func TestFactoryParseRejectsInvalidTokens(t *testing.T) {
 		want    error
 	}{
 		{name: "wrong key", factory: NewFactory("key-1", testSigner("other-secret")), data: encoded, want: ErrUnauthorized},
+		{name: "altered header", factory: f, data: replaceTokenJSON(t, encoded, 0, "cty", "tampered"), want: ErrUnauthorized},
 		{name: "altered payload", factory: f, data: replaceTokenJSON(t, encoded, 1, "sub", "altered"), want: ErrUnauthorized},
 		{name: "altered signature", factory: f, data: strings.Join(alteredSignature, "."), want: ErrUnauthorized},
 		{name: "wrong algorithm", factory: f, data: replaceTokenJSON(t, encoded, 0, "alg", "none"), want: ErrUnauthorized},
@@ -126,6 +135,96 @@ func TestFactoryParseRejectsInvalidTokens(t *testing.T) {
 			}
 			if !errors.Is(err, tt.want) {
 				t.Errorf("Parse() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestFactoryTokenWithoutClaim(t *testing.T) {
+	f := NewFactory("key-1", testSigner("secret"))
+	token, err := f.Token(time.Hour, nil)
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	parsed, err := f.Parse(token.String())
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if parsed.HasClaim() {
+		t.Error("HasClaim() = true, want false")
+	}
+	var claim interface{}
+	if err = parsed.Claim(&claim); !errors.Is(err, ErrMissingClaim) {
+		t.Errorf("Claim() error = %v, want %v", err, ErrMissingClaim)
+	}
+}
+
+func TestFactoryPropagatesSignerErrors(t *testing.T) {
+	failing := NewFactory("key-1", failingSigner{})
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{name: "Sign", run: func() error {
+			token, err := NewToken(time.Hour, nil)
+			if err != nil {
+				t.Fatalf("NewToken() error = %v", err)
+			}
+			return failing.Sign(token)
+		}},
+		{name: "Token", run: func() error {
+			_, err := failing.Token(time.Hour, nil)
+			return err
+		}},
+		{name: "Validate", run: func() error {
+			token := newSignedTestToken(t)
+			return failing.Validate(token)
+		}},
+		{name: "Parse", run: func() error {
+			token := newSignedTestToken(t)
+			_, err := failing.Parse(token.String())
+			return err
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(); !errors.Is(err, errTestSigner) {
+				t.Errorf("error = %v, want %v", err, errTestSigner)
+			}
+		})
+	}
+}
+
+func TestFactoryNilReceiverID(t *testing.T) {
+	if got := NewFactory("key-1", testSigner("secret")).ID(); got != "key-1" {
+		t.Errorf("ID() = %q, want %q", got, "key-1")
+	}
+	if got := (*Factory)(nil).ID(); got != "" {
+		t.Errorf("ID() = %q, want empty string", got)
+	}
+}
+
+func TestFactoryOperationsRejectBadConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		factory *Factory
+	}{
+		{name: "nil factory", factory: nil},
+		{name: "empty key ID", factory: NewFactory("", testSigner("secret"))},
+		{name: "nil signer", factory: NewFactory("key-1", nil)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.factory.Sign(newSignedTestToken(t)); !errors.Is(err, ErrBadFactory) {
+				t.Errorf("Sign() error = %v, want %v", err, ErrBadFactory)
+			}
+			if token, err := tt.factory.Token(time.Hour, nil); token != nil || !errors.Is(err, ErrBadFactory) {
+				t.Errorf("Token() = (%v, %v), want (nil, %v)", token, err, ErrBadFactory)
+			}
+			if err := tt.factory.Validate(newSignedTestToken(t)); !errors.Is(err, ErrBadFactory) {
+				t.Errorf("Validate() error = %v, want %v", err, ErrBadFactory)
 			}
 		})
 	}
@@ -191,4 +290,13 @@ func replaceTokenSection(token string, section int, value string) string {
 	sections := strings.Split(token, ".")
 	sections[section] = value
 	return strings.Join(sections, ".")
+}
+
+func newSignedTestToken(t *testing.T) *Token {
+	t.Helper()
+	token, err := NewFactory("key-1", testSigner("secret")).Token(time.Hour, nil)
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	return token
 }

@@ -24,6 +24,8 @@ SOFTWARE.
 package signers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"testing"
 )
@@ -37,5 +39,42 @@ func TestNewHS256RejectsEmptySecret(t *testing.T) {
 		if !errors.Is(err, ErrEmptySecret) {
 			t.Errorf("NewHS256(%v) error = %v, want %v", secret, err, ErrEmptySecret)
 		}
+	}
+}
+
+func TestConstantError(t *testing.T) {
+	const errValue = ErrEmptySecret
+	if ErrEmptySecret != errValue {
+		t.Errorf("ErrEmptySecret = %v, want %v", ErrEmptySecret, errValue)
+	}
+	if got, want := ErrEmptySecret.Error(), "empty secret"; got != want {
+		t.Errorf("ErrEmptySecret.Error() = %q, want %q", got, want)
+	}
+	if !errors.Is(ErrEmptySecret, errValue) {
+		t.Errorf("errors.Is(%v, %v) = false, want true", ErrEmptySecret, errValue)
+	}
+}
+
+func TestHS256(t *testing.T) {
+	secret := []byte("secret")
+	signer, err := NewHS256(secret)
+	if err != nil {
+		t.Fatalf("NewHS256() error = %v", err)
+	}
+	secret[0] = 'X'
+
+	message := []byte("header.payload")
+	got, err := signer.Sign(message)
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+	h := hmac.New(sha256.New, []byte("secret"))
+	_, _ = h.Write(message)
+	want := h.Sum(nil)
+	if !hmac.Equal(got, want) {
+		t.Errorf("Sign() = %x, want %x", got, want)
+	}
+	if got := signer.Algorithm(); got != "HS256" {
+		t.Errorf("Algorithm() = %q, want %q", got, "HS256")
 	}
 }

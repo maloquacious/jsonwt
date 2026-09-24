@@ -30,9 +30,12 @@ import (
 
 // FromBearerToken returns the Token from the Authorization header.
 // The Bearer scheme is matched case-insensitively. The token is decoded but
-// not verified; callers must validate it before use. If the header is missing
-// or malformed, FromBearerToken returns nil.
+// not verified; callers must validate it before use. If r is nil or the header
+// is missing or malformed, FromBearerToken returns nil.
 func FromBearerToken(r *http.Request) *Token {
+	if r == nil {
+		return nil
+	}
 	authTokens := strings.Fields(r.Header.Get("Authorization"))
 	if len(authTokens) != 2 {
 		return nil
@@ -49,9 +52,12 @@ func FromBearerToken(r *http.Request) *Token {
 }
 
 // FromCookie returns the Token stored in the package cookie. The token is
-// decoded but not verified; callers must validate it before use. If the cookie
-// is missing or malformed, FromCookie returns nil.
+// decoded but not verified; callers must validate it before use. If r is nil
+// or the cookie is missing or malformed, FromCookie returns nil.
 func FromCookie(r *http.Request) *Token {
+	if r == nil {
+		return nil
+	}
 	c, err := r.Cookie(cookieName)
 	if err != nil {
 		return nil

@@ -62,13 +62,19 @@ func (t *Token) DeleteCookie(w http.ResponseWriter) {
 	DeleteCookie(w)
 }
 
-// Header is a helper function
+// Header returns the encoded token header, or an empty string for a nil Token.
 func (t *Token) Header() string {
+	if t == nil {
+		return ""
+	}
 	return t.h.b64
 }
 
-// Payload is a helper function
+// Payload returns the encoded token payload, or an empty string for a nil Token.
 func (t *Token) Payload() string {
+	if t == nil {
+		return ""
+	}
 	return t.p.b64
 }
 
@@ -79,13 +85,19 @@ func (t *Token) SetCookie(w http.ResponseWriter) {
 	SetCookie(w, t)
 }
 
-// Signature is a helper function
+// Signature returns the encoded token signature, or an empty string for a nil Token.
 func (t *Token) Signature() string {
+	if t == nil {
+		return ""
+	}
 	return t.s
 }
 
-// String implements the Stringer interface.
-// Please don't call this before signing the token.
+// String implements the Stringer interface. It returns an empty string for a
+// nil Token. Please don't call this before signing the token.
 func (t *Token) String() string {
+	if t == nil {
+		return ""
+	}
 	return t.Header() + "." + t.Payload() + "." + t.Signature()
 }

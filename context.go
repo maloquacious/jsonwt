@@ -25,15 +25,23 @@ package jsonwt
 
 import "context"
 
-// NewContext returns a new Context that carries the Token.
+// NewContext returns a new Context that carries the Token. A nil parent is
+// treated as context.Background().
 func (t *Token) NewContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, tokenContextKey, t)
 }
 
-// FromContext returns the Token value stored in ctx, if any.
+// FromContext returns the non-nil Token value stored in ctx, if any. A nil
+// context returns nil, false.
 func FromContext(ctx context.Context) (*Token, bool) {
+	if ctx == nil {
+		return nil, false
+	}
 	t, ok := ctx.Value(tokenContextKey).(*Token)
-	return t, ok
+	return t, ok && t != nil
 }
 
 // key is an unexported type for keys defined in this package.

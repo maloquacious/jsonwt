@@ -66,7 +66,7 @@ func TestFromBearerToken(t *testing.T) {
 func TestCookieRoundTrip(t *testing.T) {
 	token := newHTTPTestToken(t, "cookie")
 	w := httptest.NewRecorder()
-	SetCookie(w, token)
+	token.SetCookie(w)
 
 	cookies := w.Result().Cookies()
 	if len(cookies) != 1 {
@@ -81,6 +81,12 @@ func TestCookieRoundTrip(t *testing.T) {
 	}
 	if cookie.MaxAge <= 0 {
 		t.Errorf("cookie MaxAge = %d, want positive", cookie.MaxAge)
+	}
+	if cookie.Path != "/" {
+		t.Errorf("cookie Path = %q, want %q", cookie.Path, "/")
+	}
+	if !cookie.HttpOnly {
+		t.Error("cookie HttpOnly = false, want true")
 	}
 	if got, want := cookie.Expires.Unix(), token.p.ExpirationTime; got != want {
 		t.Errorf("cookie expiration = %d, want %d", got, want)
@@ -97,13 +103,16 @@ func TestCookieRoundTrip(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	DeleteCookie(w)
+	token.DeleteCookie(w)
 	deleted := w.Result().Cookies()
 	if len(deleted) != 1 {
 		t.Fatalf("DeleteCookie() wrote %d cookies, want 1", len(deleted))
 	}
 	if deleted[0].Name != cookieName || deleted[0].Value != "" || deleted[0].MaxAge >= 0 {
 		t.Errorf("DeleteCookie() cookie = %+v, want empty %q cookie with negative MaxAge", deleted[0], cookieName)
+	}
+	if deleted[0].Path != "/" || !deleted[0].HttpOnly || !deleted[0].Expires.Before(time.Now()) {
+		t.Errorf("DeleteCookie() attributes = %+v, want expired HttpOnly cookie scoped to /", deleted[0])
 	}
 }
 
@@ -161,6 +170,25 @@ func TestFromRequestPrecedence(t *testing.T) {
 	r.AddCookie(&http.Cookie{Name: cookieName, Value: cookie.String()})
 	if got := FromRequest(r); got == nil || got.String() != cookie.String() {
 		t.Errorf("FromRequest() with malformed bearer = %v, want cookie token", got)
+	}
+}
+
+func TestRequestHelpersAcceptNilRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		get  func(*http.Request) *Token
+	}{
+		{name: "bearer", get: FromBearerToken},
+		{name: "cookie", get: FromCookie},
+		{name: "request", get: FromRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.get(nil); got != nil {
+				t.Errorf("helper(nil) = %v, want nil", got)
+			}
+		})
 	}
 }
 

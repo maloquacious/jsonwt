@@ -24,7 +24,9 @@ SOFTWARE.
 package jsonwt
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -63,6 +65,17 @@ func TestNewTokenLifetime(t *testing.T) {
 	}
 }
 
+func TestNewTokenPropagatesClaimMarshalError(t *testing.T) {
+	token, err := NewToken(time.Hour, make(chan int))
+	if token != nil {
+		t.Errorf("NewToken() token = %v, want nil", token)
+	}
+	var unsupported *json.UnsupportedTypeError
+	if !errors.As(err, &unsupported) {
+		t.Errorf("NewToken() error = %v, want *json.UnsupportedTypeError", err)
+	}
+}
+
 func TestTokenIsValidAtTimeBoundaries(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -96,4 +109,87 @@ func TestTokenIsValidAtTimeBoundaries(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTokenValidityRequirements(t *testing.T) {
+	tests := []struct {
+		name  string
+		token *Token
+	}{
+		{name: "nil token", token: nil},
+		{name: "unsigned", token: &Token{}},
+		{name: "missing issued-at", token: validityTestToken(true, 0, 200)},
+		{name: "missing expiration", token: validityTestToken(true, 100, 0)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.token.isValidAt(time.Unix(150, 0)); got {
+				t.Error("isValidAt() = true, want false")
+			}
+		})
+	}
+}
+
+func TestTokenClaimErrors(t *testing.T) {
+	if err := (*Token)(nil).Claim(new(interface{})); !errors.Is(err, ErrBadToken) {
+		t.Errorf("nil Token Claim() error = %v, want %v", err, ErrBadToken)
+	}
+
+	unsigned, err := NewToken(time.Hour, map[string]string{"role": "reader"})
+	if err != nil {
+		t.Fatalf("NewToken() error = %v", err)
+	}
+	if err = unsigned.Claim(new(interface{})); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unsigned Claim() error = %v, want %v", err, ErrInvalid)
+	}
+
+	token := newSignedTestToken(t)
+	token.p.Claim = "%"
+	if err = token.Claim(new(interface{})); err == nil {
+		t.Error("Claim() with malformed claim encoding error = nil, want error")
+	}
+
+	token, err = NewFactory("key-1", testSigner("secret")).Token(time.Hour, "claim")
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	var invalidTarget *json.InvalidUnmarshalError
+	if err = token.Claim(nil); !errors.As(err, &invalidTarget) {
+		t.Errorf("Claim(nil) error = %v, want *json.InvalidUnmarshalError", err)
+	}
+}
+
+func TestTokenNilReceiverMethods(t *testing.T) {
+	var token *Token
+	if token.HasClaim() {
+		t.Error("HasClaim() = true, want false")
+	}
+	if token.IsValid() {
+		t.Error("IsValid() = true, want false")
+	}
+	if token.Header() != "" || token.Payload() != "" || token.Signature() != "" || token.String() != "" {
+		t.Error("encoded section accessor on nil Token returned a non-empty string")
+	}
+
+	w := httptest.NewRecorder()
+	token.SetCookie(w)
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].MaxAge >= 0 {
+		t.Errorf("SetCookie() on nil Token cookies = %+v, want one deletion", cookies)
+	}
+
+	w = httptest.NewRecorder()
+	token.DeleteCookie(w)
+	cookies = w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].MaxAge >= 0 {
+		t.Errorf("DeleteCookie() on nil Token cookies = %+v, want one deletion", cookies)
+	}
+}
+
+func validityTestToken(signed bool, issuedAt, expiresAt int64) *Token {
+	token := &Token{isSigned: signed}
+	token.p.IssuedAt = issuedAt
+	token.p.ExpirationTime = expiresAt
+	return token
 }
