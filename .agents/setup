@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly go_version="1.17.13"
+readonly go_archive="go${go_version}.linux-amd64.tar.gz"
+readonly go_checksum="4cdd2bc664724dc7db94ad51b503512c5ae7220951cac568120f64f8e94399fc"
+
+echo "==> Preparing Go toolchain"
+if [[ "$(uname -m)" != "x86_64" ]]; then
+  echo "Unsupported architecture: $(uname -m)" >&2
+  exit 1
+fi
+
+if [[ ! -x /usr/local/go/bin/go ]] || \
+   [[ "$(/usr/local/go/bin/go version)" != "go version go${go_version} linux/amd64" ]]; then
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' EXIT
+
+  time curl --fail --location --retry 3 \
+    --output "$temp_dir/$go_archive" \
+    "https://go.dev/dl/$go_archive"
+  echo "$go_checksum  $temp_dir/$go_archive" | sha256sum --check --status
+
+  rm -rf /usr/local/go
+  time tar -C /usr/local -xzf "$temp_dir/$go_archive"
+fi
+
+ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+ln -sfn /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
+echo "==> Downloading Go module dependencies"
+time go mod download
+
+echo "==> Orb setup complete ($(go version))"
