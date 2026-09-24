@@ -18,6 +18,43 @@ Complete versions of these recipes are exercised as executable examples in
 [`howto_test.go`](../howto_test.go). Use `jsonwt` only for the non-production
 environments described in [Security and scope](security.md).
 
+## Control time in tests
+
+**Goal:** issue and validate tokens at exact times without sleeping.
+
+Production code should use `NewFactory`, which reads the system clock. In a
+test, implement the small `Clock` interface and pass it to
+`NewFactoryWithClock`:
+
+```go
+type fixedClock struct {
+	now time.Time
+}
+
+func (c *fixedClock) Now() time.Time { return c.now }
+
+signer, err := signers.NewHS256([]byte("test-secret"))
+if err != nil {
+	panic(err)
+}
+clock := &fixedClock{now: time.Unix(1_700_000_000, 0)}
+factory := jsonwt.NewFactoryWithClock("test-key", signer, clock)
+
+token, err := factory.Token(time.Minute, nil)
+if err != nil {
+	panic(err)
+}
+
+clock.now = clock.now.Add(time.Minute)
+fmt.Println(token.IsValid()) // false: exp is an exclusive boundary
+```
+
+The factory clock controls token `iat` and `exp`, as well as the `iat`, `nbf`,
+and `exp` checks performed by `Validate` and `Parse`. A token successfully
+created or validated by that factory retains the same clock for `IsValid` and
+`Claim`. The clock is local in-memory state and is not encoded into the token.
+Do not pass a nil clock; operations on that factory return `ErrBadFactory`.
+
 ## Issue and read custom application claims
 
 **Goal:** round-trip application-specific JSON through a signed token.

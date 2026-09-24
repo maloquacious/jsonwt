@@ -31,7 +31,8 @@ type Error string
 func (e Error) Error() string { return string(e) }
 
 const (
-	// ErrBadFactory indicates a nil Factory, empty factory key ID, or nil Signer.
+	// ErrBadFactory indicates a nil Factory, empty factory key ID, nil Signer,
+	// or nil Clock.
 	ErrBadFactory = Error("bad factory")
 	// ErrBadToken indicates malformed compact framing, base64, JSON, or signature
 	// encoding. Claim returns ErrBadToken for a nil Token.

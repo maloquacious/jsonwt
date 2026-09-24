@@ -55,11 +55,14 @@ import (
 // raw-URL-base64 representation in the package-specific claim field. JSON
 // marshal errors are returned unchanged. A nil claim omits that field.
 func NewToken(ttl time.Duration, claim interface{}) (*Token, error) {
+	return newToken(ttl, claim, time.Now().UTC())
+}
+
+func newToken(ttl time.Duration, claim interface{}, now time.Time) (*Token, error) {
 	if ttl <= 0 {
 		return nil, ErrInvalid
 	}
 
-	now := time.Now().UTC()
 	var t Token
 	t.h.Version = 1
 	t.h.TokenType = "JWT"
@@ -118,4 +121,5 @@ type Token struct {
 	}
 	s        string // signature base-64 encoded
 	isSigned bool   // true only if the signature has been verified
+	clock    Clock  // clock associated by successful Factory operations
 }

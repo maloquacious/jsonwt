@@ -29,11 +29,16 @@ import (
 )
 
 // IsValid reports whether the Token has a successfully generated or verified
-// signature and is valid at the current UTC time. A nil or unsigned Token, or
-// one with a zero iat or exp, is invalid. The iat and optional nbf boundaries
-// are inclusive: now >= iat and now >= nbf. The exp boundary is exclusive:
-// now < exp. A zero nbf imposes no additional boundary.
+// signature and is valid at the current time. Tokens successfully created or
+// validated by a Factory use that Factory's clock; other tokens use the system
+// clock. A nil or unsigned Token, or one with a zero iat or exp, is invalid. The
+// iat and optional nbf boundaries are inclusive: now >= iat and now >= nbf. The
+// exp boundary is exclusive: now < exp. A zero nbf imposes no additional
+// boundary.
 func (t *Token) IsValid() bool {
+	if t != nil && t.clock != nil {
+		return t.isValidAt(t.clock.Now().UTC())
+	}
 	return t.isValidAt(time.Now().UTC())
 }
 

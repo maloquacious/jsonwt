@@ -52,6 +52,125 @@ func (failingSigner) Algorithm() string { return "HS256" }
 
 func (failingSigner) Sign([]byte) ([]byte, error) { return nil, errTestSigner }
 
+type testClock struct {
+	now time.Time
+}
+
+func (c *testClock) Now() time.Time { return c.now }
+
+func TestFactoryClockIssuesExactLifetime(t *testing.T) {
+	clock := &testClock{now: time.Date(2030, time.March, 14, 15, 9, 26, 500_000_000, time.FixedZone("test", -6*60*60))}
+	f := NewFactoryWithClock("key-1", testSigner("secret"), clock)
+	token, err := f.Token(90*time.Second, "claim")
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if got, want := token.p.IssuedAt, clock.now.Unix(); got != want {
+		t.Errorf("iat = %d, want %d", got, want)
+	}
+	if got, want := token.p.ExpirationTime, clock.now.Add(90*time.Second).Unix(); got != want {
+		t.Errorf("exp = %d, want %d", got, want)
+	}
+	if !token.IsValid() {
+		t.Fatal("IsValid() = false at issuance, want true")
+	}
+
+	clock.now = time.Unix(token.p.ExpirationTime, 0)
+	if token.IsValid() {
+		t.Error("IsValid() = true at expiration, want false")
+	}
+	if err := token.Claim(new(string)); !errors.Is(err, ErrInvalid) {
+		t.Errorf("Claim() error = %v, want %v", err, ErrInvalid)
+	}
+}
+
+func TestFactoryClockValidationBoundaries(t *testing.T) {
+	tests := []struct {
+		name      string
+		now       int64
+		issuedAt  int64
+		notBefore int64
+		expiresAt int64
+		wantValid bool
+	}{
+		{name: "before issued-at", now: 99, issuedAt: 100, expiresAt: 200},
+		{name: "at issued-at", now: 100, issuedAt: 100, expiresAt: 200, wantValid: true},
+		{name: "after issued-at", now: 101, issuedAt: 100, expiresAt: 200, wantValid: true},
+		{name: "before not-before", now: 149, issuedAt: 100, notBefore: 150, expiresAt: 200},
+		{name: "at not-before", now: 150, issuedAt: 100, notBefore: 150, expiresAt: 200, wantValid: true},
+		{name: "after not-before", now: 151, issuedAt: 100, notBefore: 150, expiresAt: 200, wantValid: true},
+		{name: "before expiration", now: 199, issuedAt: 100, expiresAt: 200, wantValid: true},
+		{name: "at expiration", now: 200, issuedAt: 100, expiresAt: 200},
+		{name: "after expiration", now: 201, issuedAt: 100, expiresAt: 200},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clock := &testClock{now: time.Unix(tt.now, 0)}
+			f := NewFactoryWithClock("key-1", testSigner("secret"), clock)
+			token := &Token{}
+			token.p.IssuedAt = tt.issuedAt
+			token.p.NotBefore = tt.notBefore
+			token.p.ExpirationTime = tt.expiresAt
+			if err := f.Sign(token); err != nil {
+				t.Fatalf("Sign() error = %v", err)
+			}
+
+			decoded, err := Decode(token.String())
+			if err != nil {
+				t.Fatalf("Decode() error = %v", err)
+			}
+			err = f.Validate(decoded)
+			if got := err == nil; got != tt.wantValid {
+				t.Errorf("Validate() valid = %t, want %t (error = %v)", got, tt.wantValid, err)
+			}
+			if tt.wantValid && !decoded.IsValid() {
+				t.Error("Validate() result IsValid() = false, want true")
+			}
+
+			parsed, err := f.Parse(token.String())
+			if got := err == nil; got != tt.wantValid {
+				t.Errorf("Parse() valid = %t, want %t (error = %v)", got, tt.wantValid, err)
+			}
+			if tt.wantValid {
+				if parsed == nil || !parsed.IsValid() {
+					t.Error("Parse() result IsValid() = false, want true")
+				}
+			} else if !errors.Is(err, ErrInvalid) {
+				t.Errorf("Parse() error = %v, want %v", err, ErrInvalid)
+			}
+		})
+	}
+}
+
+func TestFactoryParsedTokenRetainsClock(t *testing.T) {
+	clock := &testClock{now: time.Unix(100, 0)}
+	f := NewFactoryWithClock("key-1", testSigner("secret"), clock)
+	issued, err := f.Token(10*time.Second, "claim")
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	parsed, err := f.Parse(issued.String())
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	var claim string
+	if err = parsed.Claim(&claim); err != nil {
+		t.Fatalf("Claim() error = %v", err)
+	}
+	if claim != "claim" {
+		t.Errorf("Claim() = %q, want %q", claim, "claim")
+	}
+
+	clock.now = time.Unix(110, 0)
+	if parsed.IsValid() {
+		t.Error("IsValid() = true after advancing clock to expiration, want false")
+	}
+	if err = parsed.Claim(&claim); !errors.Is(err, ErrInvalid) {
+		t.Errorf("Claim() error = %v, want %v", err, ErrInvalid)
+	}
+}
+
 func TestFactoryParse(t *testing.T) {
 	f := NewFactory("key-1", testSigner("secret"))
 	token, err := f.Token(time.Hour, struct {
@@ -117,6 +236,7 @@ func TestFactoryParseRejectsInvalidTokens(t *testing.T) {
 		{name: "expired", factory: f, data: expired.String(), want: ErrInvalid},
 		{name: "empty factory ID", factory: NewFactory("", testSigner("secret")), data: encoded, want: ErrBadFactory},
 		{name: "nil signer", factory: NewFactory("key-1", nil), data: encoded, want: ErrBadFactory},
+		{name: "nil clock", factory: NewFactoryWithClock("key-1", testSigner("secret"), nil), data: encoded, want: ErrBadFactory},
 		{name: "nil factory", factory: nil, data: encoded, want: ErrBadFactory},
 		{name: "empty input", factory: f, data: "", want: ErrBadToken},
 		{name: "missing section", factory: f, data: "header.payload", want: ErrBadToken},
@@ -213,6 +333,7 @@ func TestFactoryOperationsRejectBadConfiguration(t *testing.T) {
 		{name: "nil factory", factory: nil},
 		{name: "empty key ID", factory: NewFactory("", testSigner("secret"))},
 		{name: "nil signer", factory: NewFactory("key-1", nil)},
+		{name: "nil clock", factory: NewFactoryWithClock("key-1", testSigner("secret"), nil)},
 	}
 
 	for _, tt := range tests {

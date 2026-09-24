@@ -29,20 +29,41 @@ import (
 	"time"
 )
 
-// NewFactory returns a Factory that identifies and signs tokens with kid and s.
-// It always returns a non-nil Factory; configuration validation is deferred to
-// Sign, Token, Parse, and Validate, which return ErrBadFactory when kid is empty
-// or s is nil. Factories are cheap and contain no key-discovery or key-ring
-// behavior, so callers rotate keys by creating and selecting a new Factory.
+// NewFactory returns a Factory that identifies and signs tokens with kid and s
+// and uses the system clock. It always returns a non-nil Factory; configuration
+// validation is deferred to Sign, Token, Parse, and Validate, which return
+// ErrBadFactory when kid is empty or s is nil. Factories are cheap and contain
+// no key-discovery or key-ring behavior, so callers rotate keys by creating and
+// selecting a new Factory.
 func NewFactory(kid string, s Signer) *Factory {
-	return &Factory{kid: kid, s: s}
+	return NewFactoryWithClock(kid, s, systemClock{})
+}
+
+// Clock supplies the current time used to issue and validate tokens. Clock
+// implementations may return a time in any location; Factory converts it to
+// UTC before use.
+type Clock interface {
+	Now() time.Time
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now() }
+
+// NewFactoryWithClock returns a Factory that uses clock to issue and validate
+// tokens. It is intended for deterministic tests; production callers should
+// normally use NewFactory. A nil clock makes the Factory invalid, causing Sign,
+// Token, Parse, and Validate to return ErrBadFactory.
+func NewFactoryWithClock(kid string, s Signer, clock Clock) *Factory {
+	return &Factory{kid: kid, s: s, clock: clock}
 }
 
 // Factory creates, signs, parses, and validates Tokens with one key ID and one
 // Signer. A Factory does not discover keys or select among multiple signers.
 type Factory struct {
-	kid string
-	s   Signer
+	kid   string
+	s     Signer
+	clock Clock
 }
 
 // ID returns the key ID supplied to NewFactory. A nil Factory has an empty ID.
@@ -81,7 +102,7 @@ func (f *Factory) Parse(data string) (*Token, error) {
 // validity. It returns ErrBadFactory for a nil or misconfigured Factory,
 // ErrInvalid for a nil Token, and propagates JSON and Signer errors.
 func (f *Factory) Sign(t *Token) error {
-	if f == nil || f.kid == "" || f.s == nil {
+	if f == nil || f.kid == "" || f.s == nil || f.clock == nil {
 		return ErrBadFactory
 	} else if t == nil {
 		return ErrInvalid
@@ -123,24 +144,25 @@ func (f *Factory) Sign(t *Token) error {
 // before examining ttl or claim when the Factory is nil or misconfigured. It
 // otherwise returns errors from NewToken or Sign unchanged.
 func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
-	if f == nil || f.kid == "" || f.s == nil {
+	if f == nil || f.kid == "" || f.s == nil || f.clock == nil {
 		return nil, ErrBadFactory
 	}
 
-	t, err := NewToken(ttl, claim)
+	t, err := newToken(ttl, claim, f.clock.Now().UTC())
 	if err != nil {
 		return nil, err
 	} else if err = f.Sign(t); err != nil {
 		return nil, err
 	}
+	t.clock = f.clock
 
 	return t, nil
 }
 
 // Validate verifies t's alg and kid against the Factory, decodes and compares
-// its signature in constant time, and then checks its lifetime at the current
-// UTC time. Successful validation marks t as signed so IsValid and Claim can be
-// used.
+// its signature in constant time, and then checks its lifetime using the
+// Factory clock. Successful validation marks t as signed and associates the
+// Factory clock with it so IsValid and Claim use the same clock.
 //
 // A nil Token or invalid lifetime returns ErrInvalid. For a non-nil Token, a
 // nil or misconfigured Factory returns ErrBadFactory. A malformed signature
@@ -154,7 +176,7 @@ func (f *Factory) Validate(t *Token) error {
 
 	t.isSigned = false // unset the signed flag, just to be safe
 
-	if f == nil || f.kid == "" || f.s == nil {
+	if f == nil || f.kid == "" || f.s == nil || f.clock == nil {
 		return ErrBadFactory
 	}
 	if t.h.Algorithm != f.s.Algorithm() || t.h.KeyID != f.kid {
@@ -175,9 +197,10 @@ func (f *Factory) Validate(t *Token) error {
 	if !t.isSigned {
 		return ErrUnauthorized
 	}
-	if !t.IsValid() {
+	if !t.isValidAt(f.clock.Now().UTC()) {
 		return ErrInvalid
 	}
+	t.clock = f.clock
 
 	return nil
 }

@@ -66,9 +66,12 @@ The second section decodes to a JSON object with these fields:
 | `jti` | string | Optional | Token ID metadata. The v1 API does not expose, set, or validate it. |
 | `claim` | string | Optional | Package-specific application claim described below. |
 
-`NewToken` sets `iat` to the current UTC Unix second and `exp` to the Unix
-second represented by current time plus the requested TTL. It sets no `nbf`.
-Time values have one-second precision.
+`NewToken` sets `iat` from the system clock's current UTC Unix second and `exp`
+to the Unix second represented by that time plus the requested TTL.
+`Factory.Token` uses its factory clock instead; `NewFactory` supplies the system
+clock, while `NewFactoryWithClock` permits deterministic test clocks. Neither
+clock configuration nor clock state is encoded in the token. Issuance sets no
+`nbf`. Time values have one-second precision.
 
 At a time `now`, a signed token is valid exactly when all these conditions hold:
 

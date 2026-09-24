@@ -19,12 +19,38 @@ type sessionClaim struct {
 	Tags []string `json:"tags"`
 }
 
+type fixedClock struct {
+	now time.Time
+}
+
+func (c *fixedClock) Now() time.Time { return c.now }
+
 func newFactory(keyID, secret string) *jsonwt.Factory {
 	signer, err := signers.NewHS256([]byte(secret))
 	if err != nil {
 		panic(err)
 	}
 	return jsonwt.NewFactory(keyID, signer)
+}
+
+func Example_testClock() {
+	signer, err := signers.NewHS256([]byte("test-secret"))
+	if err != nil {
+		panic(err)
+	}
+	clock := &fixedClock{now: time.Unix(1_700_000_000, 0)}
+	factory := jsonwt.NewFactoryWithClock("test-key", signer, clock)
+
+	token, err := factory.Token(time.Minute, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	clock.now = clock.now.Add(time.Minute)
+	fmt.Println(token.IsValid())
+
+	// Output:
+	// false
 }
 
 func Example_customClaims() {
