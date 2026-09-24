@@ -28,10 +28,13 @@ import (
 	"strings"
 )
 
-// FromBearerToken returns the Token from the Authorization header.
-// The Bearer scheme is matched case-insensitively. The token is decoded but
-// not verified; callers must validate it before use. If r is nil or the header
-// is missing or malformed, FromBearerToken returns nil.
+// FromBearerToken decodes the Token in r's Authorization header. The header
+// must contain exactly two whitespace-separated fields; the first must be the
+// Bearer scheme, matched case-insensitively, and the second must be a compact
+// token accepted by Decode.
+//
+// FromBearerToken does not verify the token. Callers must use Factory.Validate
+// before use. It returns nil when r is nil or the header or token is malformed.
 func FromBearerToken(r *http.Request) *Token {
 	if r == nil {
 		return nil
@@ -51,9 +54,9 @@ func FromBearerToken(r *http.Request) *Token {
 	return j
 }
 
-// FromCookie returns the Token stored in the package cookie. The token is
-// decoded but not verified; callers must validate it before use. If r is nil
-// or the cookie is missing or malformed, FromCookie returns nil.
+// FromCookie decodes the Token in r's cookie named "jsonwt". It does not verify
+// the token; callers must use Factory.Validate before use. It returns nil when
+// r is nil or the cookie is missing or contains a malformed token.
 func FromCookie(r *http.Request) *Token {
 	if r == nil {
 		return nil
@@ -69,10 +72,11 @@ func FromCookie(r *http.Request) *Token {
 	return t
 }
 
-// FromRequest returns a decoded Token from r. A valid bearer token takes
-// precedence over the package cookie. If the bearer header is absent or
-// malformed, FromRequest falls back to the cookie. Callers must validate the
-// returned token before use.
+// FromRequest returns a decoded Token from r. A syntactically decodable bearer
+// token takes precedence over the "jsonwt" cookie, even if later validation
+// fails. If the bearer header is absent or malformed, FromRequest falls back to
+// the cookie. It returns nil for a nil request or when neither source decodes.
+// Callers must use Factory.Validate before using the returned token.
 func FromRequest(r *http.Request) *Token {
 	t := FromBearerToken(r)
 	if t == nil {

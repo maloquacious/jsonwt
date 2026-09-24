@@ -25,8 +25,9 @@ package jsonwt
 
 import "context"
 
-// NewContext returns a new Context that carries the Token. A nil parent is
-// treated as context.Background().
+// NewContext returns a child context carrying t under a package-private key. A
+// nil parent is treated as context.Background. NewContext does not validate t.
+// A nil Token receiver may be stored, but FromContext reports it as absent.
 func (t *Token) NewContext(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -34,8 +35,9 @@ func (t *Token) NewContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, tokenContextKey, t)
 }
 
-// FromContext returns the non-nil Token value stored in ctx, if any. A nil
-// context returns nil, false.
+// FromContext returns the non-nil Token stored by Token.NewContext. It returns
+// nil, false for a nil context, a missing value, a value of another type, or a
+// stored nil Token. FromContext does not validate the Token.
 func FromContext(ctx context.Context) (*Token, bool) {
 	if ctx == nil {
 		return nil, false

@@ -23,12 +23,13 @@
 
 package jsonwt
 
-// Signer interface
+// Signer supplies the algorithm identifier and message authentication used by
+// a Factory. Implementations must return the same signature for the same
+// message and key so Factory.Validate can compare signatures.
 type Signer interface {
-	// Algorithm returns the name of the algorithm used by the signer.
-	// The Factory will set the Token header's "alg" field to this value when it is signed.
-	// Example: "HS256"
+	// Algorithm returns the token header's alg value, for example "HS256".
 	Algorithm() string
-	// Sign returns a slice containing the signature of the message.
+	// Sign returns the signature of msg. A Factory passes the exact bytes of
+	// the encoded header, a period, and the encoded payload.
 	Sign(msg []byte) ([]byte, error)
 }

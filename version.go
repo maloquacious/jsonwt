@@ -23,7 +23,7 @@
 
 package jsonwt
 
-// Version returns the version of the package.
+// Version returns the package-declared version string, currently "0.1.0".
 func Version() string {
 	return "0.1.0"
 }

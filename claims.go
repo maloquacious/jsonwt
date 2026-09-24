@@ -25,8 +25,14 @@ package jsonwt
 
 import "encoding/json"
 
-// Claim retrieves the private payload from the Token and marshals it into the given variable.
-// It returns errors if the Token is not valid, has no private payload, or there's an error unmarshalling the data.
+// Claim decodes the application claim as JSON into v. The Token must currently
+// be valid, and v must satisfy the same requirements as json.Unmarshal,
+// normally a non-nil pointer.
+//
+// Claim returns ErrBadToken for a nil receiver, ErrInvalid for an unsigned or
+// time-invalid Token, and ErrMissingClaim when the claim field is absent. Claim
+// base64 and JSON decoding errors, including invalid destination errors, are
+// returned unchanged.
 func (t *Token) Claim(v interface{}) error {
 	if t == nil {
 		return ErrBadToken
@@ -42,8 +48,8 @@ func (t *Token) Claim(v interface{}) error {
 	return json.Unmarshal(b, v)
 }
 
-// HasClaim returns true if Token has a claim defined in its payload.
-// Note: Token.Claim may fail to return a claim if the Token is invalid.
+// HasClaim reports whether the package-specific claim field is present. It
+// does not validate the Token or decode the claim. A nil Token returns false.
 func (t *Token) HasClaim() bool {
 	return t != nil && t.p.Claim != ""
 }

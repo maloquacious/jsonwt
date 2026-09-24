@@ -28,9 +28,11 @@ import (
 	"time"
 )
 
-// IsValid returns true only if the Token is signed, issued, active, and not
-// expired. IssuedAt and NotBefore are inclusive boundaries; ExpirationTime is
-// exclusive.
+// IsValid reports whether the Token has a successfully generated or verified
+// signature and is valid at the current UTC time. A nil or unsigned Token, or
+// one with a zero iat or exp, is invalid. The iat and optional nbf boundaries
+// are inclusive: now >= iat and now >= nbf. The exp boundary is exclusive:
+// now < exp. A zero nbf imposes no additional boundary.
 func (t *Token) IsValid() bool {
 	return t.isValidAt(time.Now().UTC())
 }
@@ -57,12 +59,14 @@ func (t *Token) isValidAt(now time.Time) bool {
 	return true
 }
 
-// DeleteCookie removes the package cookie associated with the Token.
+// DeleteCookie writes the package's deletion cookie. The receiver may be nil;
+// it is not inspected. w must be non-nil.
 func (t *Token) DeleteCookie(w http.ResponseWriter) {
 	DeleteCookie(w)
 }
 
-// Header returns the encoded token header, or an empty string for a nil Token.
+// Header returns the token's unpadded raw-URL-base64 header section. It returns
+// an empty string for a nil Token or an unsigned Token not yet encoded by Sign.
 func (t *Token) Header() string {
 	if t == nil {
 		return ""
@@ -70,7 +74,9 @@ func (t *Token) Header() string {
 	return t.h.b64
 }
 
-// Payload returns the encoded token payload, or an empty string for a nil Token.
+// Payload returns the token's unpadded raw-URL-base64 payload section. It
+// returns an empty string for a nil Token or an unsigned Token not yet encoded
+// by Sign.
 func (t *Token) Payload() string {
 	if t == nil {
 		return ""
@@ -78,14 +84,17 @@ func (t *Token) Payload() string {
 	return t.p.b64
 }
 
-// SetCookie sends the Token to the client in the package cookie. The cookie
-// expires no later than the Token. A nil or already-expired Token deletes the
-// cookie.
+// SetCookie writes the Token using the package cookie contract documented by
+// the package-level SetCookie function. A nil receiver writes a deletion
+// cookie. w must be non-nil.
 func (t *Token) SetCookie(w http.ResponseWriter) {
 	SetCookie(w, t)
 }
 
-// Signature returns the encoded token signature, or an empty string for a nil Token.
+// Signature returns the token's signature section verbatim. Factory.Sign
+// produces unpadded raw-URL-base64; Decode preserves any non-empty signature
+// text for later validation. Signature returns an empty string for a nil Token
+// or a newly created Token not yet signed.
 func (t *Token) Signature() string {
 	if t == nil {
 		return ""
@@ -93,8 +102,10 @@ func (t *Token) Signature() string {
 	return t.s
 }
 
-// String implements the Stringer interface. It returns an empty string for a
-// nil Token. Please don't call this before signing the token.
+// String returns the compact header.payload.signature representation and
+// implements fmt.Stringer. It returns an empty string for a nil Token. A Token
+// returned by NewToken has empty encoded sections until Factory.Sign is called
+// and must not be transported before then.
 func (t *Token) String() string {
 	if t == nil {
 		return ""

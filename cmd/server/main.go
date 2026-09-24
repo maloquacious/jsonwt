@@ -39,14 +39,14 @@ func main() {
 	}
 }
 
-type AUTHRESPONSE struct {
+type authResponse struct {
 	Data struct {
 		Token   string `json:"token"`
 		Version string `json:"version"`
 	} `json:"data"`
 }
 
-type CLAIM struct {
+type claimData struct {
 	Roles []string
 }
 
@@ -58,7 +58,7 @@ func run() error {
 	f := jsonwt.NewFactory("me", s)
 	log.Printf("using factory %q\n", f.ID())
 
-	claim := CLAIM{
+	claim := claimData{
 		Roles: []string{"one", "two"},
 	}
 
@@ -76,7 +76,7 @@ func run() error {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-			var rsp AUTHRESPONSE
+			var rsp authResponse
 			rsp.Data.Version = jsonwt.Version()
 			rsp.Data.Token = t.String()
 			b, err := json.MarshalIndent(rsp, "", "  ")
@@ -102,7 +102,7 @@ func run() error {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
-			var c CLAIM
+			var c claimData
 			err = t.Claim(&c)
 			if err != nil {
 				log.Printf("%s %s: %+v\n", r.Method, r.URL, err)

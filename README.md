@@ -32,6 +32,7 @@ token, and extract the claim.
 - [Tutorial and user manual](docs/tutorial.md)
 - [How-to guides](docs/how-to.md)
 - [API reference](https://pkg.go.dev/github.com/mdhender/jsonwt)
+- [Token format reference](docs/token-format.md)
 - [Security and design explanation](docs/security.md)
 
 ## License

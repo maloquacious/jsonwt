@@ -29,20 +29,23 @@ import (
 	"time"
 )
 
-// NewFactory returns an initialized factory.
-// The signer is used to sign the generated tokens.
-// Factories are cheap, so create a new one to rotate keys.
-// Factory operations return ErrBadFactory if kid is empty or s is nil.
+// NewFactory returns a Factory that identifies and signs tokens with kid and s.
+// It always returns a non-nil Factory; configuration validation is deferred to
+// Sign, Token, Parse, and Validate, which return ErrBadFactory when kid is empty
+// or s is nil. Factories are cheap and contain no key-discovery or key-ring
+// behavior, so callers rotate keys by creating and selecting a new Factory.
 func NewFactory(kid string, s Signer) *Factory {
 	return &Factory{kid: kid, s: s}
 }
 
+// Factory creates, signs, parses, and validates Tokens with one key ID and one
+// Signer. A Factory does not discover keys or select among multiple signers.
 type Factory struct {
 	kid string
 	s   Signer
 }
 
-// ID returns the id of the current signer. A nil Factory has an empty id.
+// ID returns the key ID supplied to NewFactory. A nil Factory has an empty ID.
 func (f *Factory) ID() string {
 	if f == nil {
 		return ""
@@ -50,10 +53,15 @@ func (f *Factory) ID() string {
 	return f.kid
 }
 
-// Parse decodes data and validates its factory metadata, signature, and
-// lifetime. A successful Parse returns a token that is safe to inspect and use.
-// Malformed data returns ErrBadToken, metadata or signature mismatches return
-// ErrUnauthorized, and invalid token lifetimes return ErrInvalid.
+// Parse decodes data, then validates its algorithm, key ID, signature, and
+// lifetime. On success it returns a verified Token. On every error it returns a
+// nil Token.
+//
+// Malformed compact data or signature encoding returns ErrBadToken. An
+// algorithm, key ID, or signature mismatch returns ErrUnauthorized. An
+// inactive, expired, or incomplete lifetime returns ErrInvalid. A malformed
+// input is rejected before factory configuration is checked; otherwise a nil
+// or misconfigured Factory returns ErrBadFactory. Signer errors are propagated.
 func (f *Factory) Parse(data string) (*Token, error) {
 	t, err := Decode(data)
 	if err != nil {
@@ -65,10 +73,13 @@ func (f *Factory) Parse(data string) (*Token, error) {
 	return t, nil
 }
 
-// Sign will sign a Token.
-// It uses the current values in the header and payload, so it is safe to call multiple times.
-// It updates the Token's Algorithm field to match the factory's signer's algorithm.
-// It updates the Token's KeyID field to match the factory's key id.
+// Sign encodes and signs t. It sets the token's alg and kid fields from the
+// Factory, regenerates the encoded header and payload, and replaces any prior
+// signature. Calling Sign repeatedly is safe.
+//
+// Sign marks t as signed after the Signer succeeds, but does not check its time
+// validity. It returns ErrBadFactory for a nil or misconfigured Factory,
+// ErrInvalid for a nil Token, and propagates JSON and Signer errors.
 func (f *Factory) Sign(t *Token) error {
 	if f == nil || f.kid == "" || f.s == nil {
 		return ErrBadFactory
@@ -107,10 +118,10 @@ func (f *Factory) Sign(t *Token) error {
 	return nil
 }
 
-// Token is a helper to create a new, signed Token.
-// ttl must be positive; token timestamps have one-second precision. Token
-// returns ErrInvalid when ttl is zero or negative.
-// `claim` is the private application payload to add to the Token.
+// Token creates a Token with NewToken and signs it with the Factory. ttl and
+// claim have the semantics documented by NewToken. Token returns ErrBadFactory
+// before examining ttl or claim when the Factory is nil or misconfigured. It
+// otherwise returns errors from NewToken or Sign unchanged.
 func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
 	if f == nil || f.kid == "" || f.s == nil {
 		return nil, ErrBadFactory
@@ -126,10 +137,16 @@ func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
 	return t, nil
 }
 
-// Validate verifies the Token's factory metadata, signature, and lifetime.
-// It marks the Token as signed only when its signature is valid. A nil Token
-// or invalid lifetime returns ErrInvalid, and a malformed signature returns
-// ErrBadToken.
+// Validate verifies t's alg and kid against the Factory, decodes and compares
+// its signature in constant time, and then checks its lifetime at the current
+// UTC time. Successful validation marks t as signed so IsValid and Claim can be
+// used.
+//
+// A nil Token or invalid lifetime returns ErrInvalid. For a non-nil Token, a
+// nil or misconfigured Factory returns ErrBadFactory. A malformed signature
+// encoding returns ErrBadToken; metadata or signature mismatches return
+// ErrUnauthorized. Signer errors are propagated. Validate always clears any
+// prior signed state before checking the token.
 func (f *Factory) Validate(t *Token) error {
 	if t == nil {
 		return ErrInvalid

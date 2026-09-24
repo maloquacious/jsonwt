@@ -21,7 +21,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ******************************************************************************/
 
-// Package jsonwt defines a JSON Web Token type that's stored in Cookies and Contexts.
+// Package jsonwt issues and verifies small, signed tokens for local tools,
+// tests, demos, and trusted prototypes.
+//
+// Tokens use the familiar header.payload.signature shape, but their fields and
+// claim representation are package-specific. This package is not a general
+// RFC 7519 JWT implementation and its tokens are not promised to interoperate
+// with JWT libraries. Token contents are encoded, not encrypted.
+//
+// The normal lifecycle is to create a Factory from a Signer, issue a signed
+// Token with Factory.Token, transport Token.String, and consume it with
+// Factory.Parse. Decode and the HTTP extraction helpers do not verify tokens.
+//
+// The v1 API supports Go 1.17 and later. Exported API behavior and the
+// documented token wire format are compatibility commitments throughout v1;
+// incompatible changes require a new major version.
 package jsonwt
 
 import (
@@ -29,12 +43,17 @@ import (
 	"time"
 )
 
-// NewToken returns an unsigned Token (the caller must use a Factory to sign the token).
-// ttl is the time-to-live for the token and must be positive. Token timestamps
-// have one-second precision, so callers should use a ttl of at least one second.
-// NewToken returns ErrInvalid when ttl is zero or negative.
-// `claim` is the optional private payload for use by the application.
-// If provided, claim will be marshalled to JSON, then base64 encoded.
+// NewToken returns an unsigned Token issued at the current UTC time. The caller
+// must use Factory.Sign before transporting or using it.
+//
+// ttl must be positive. NewToken records iat and exp as whole Unix seconds and
+// returns ErrInvalid when ttl is zero or negative. A positive ttl shorter than
+// one second can truncate to the same iat and exp and therefore produce an
+// immediately invalid token; callers should use at least one second.
+//
+// If claim is non-nil, NewToken marshals it as JSON and stores its unpadded
+// raw-URL-base64 representation in the package-specific claim field. JSON
+// marshal errors are returned unchanged. A nil claim omits that field.
 func NewToken(ttl time.Duration, claim interface{}) (*Token, error) {
 	if ttl <= 0 {
 		return nil, ErrInvalid
@@ -56,7 +75,13 @@ func NewToken(ttl time.Duration, claim interface{}) (*Token, error) {
 	return &t, nil
 }
 
-// Token implements my version of the JSON Web Token.
+// Token is a package-specific signed token. Its fields are intentionally
+// opaque; use a Factory to create, sign, parse, and validate tokens, and use the
+// Token methods to inspect their encoded sections and application claim.
+//
+// A Token returned by NewToken is unsigned. A Token returned by Decode or an
+// HTTP extraction helper is unverified. Factory.Token returns a signed token,
+// and Factory.Parse returns a decoded token only after successful validation.
 type Token struct {
 	h struct {
 		Version     int    `json:"ver,omitempty"`

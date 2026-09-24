@@ -30,7 +30,10 @@ import (
 
 const cookieName = "jsonwt"
 
-// DeleteCookie removes the package cookie from the client.
+// DeleteCookie writes a deletion cookie named "jsonwt". The cookie has an
+// empty value, Path "/", HttpOnly true, Expires at Unix second 1, and MaxAge
+// -1. Domain, Secure, and SameSite retain their net/http zero values. w must be
+// non-nil.
 func DeleteCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
@@ -41,9 +44,14 @@ func DeleteCookie(w http.ResponseWriter) {
 	})
 }
 
-// SetCookie sends the Token to the client in the package cookie. The cookie
-// expires no later than the Token. A nil or already-expired Token deletes the
-// cookie.
+// SetCookie writes t in a cookie named "jsonwt". For a usable future exp, the
+// cookie has Path "/", Value t.String(), Expires equal to exp, HttpOnly true,
+// and MaxAge equal to the whole seconds remaining at call time. Domain, Secure,
+// and SameSite retain their net/http zero values.
+//
+// SetCookie writes the deletion cookie described by DeleteCookie when t is nil,
+// exp is missing or elapsed, or less than one whole second remains. It does not
+// otherwise validate t. w must be non-nil.
 func SetCookie(w http.ResponseWriter, t *Token) {
 	setCookie(w, t, time.Now().UTC())
 }

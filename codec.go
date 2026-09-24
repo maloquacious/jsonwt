@@ -31,8 +31,16 @@ import (
 	"strings"
 )
 
-// Decode decodes a token in header.payload.signature form. It does not verify
-// the token; callers should normally use Factory.Parse instead.
+// Decode parses data in header.payload.signature form without verifying it.
+// Exactly three non-empty sections are required. Decode raw-URL-base64 decodes
+// the header and payload, requires each to be a JSON object, and unmarshals the
+// package fields. It preserves all three original encoded sections verbatim.
+//
+// Decode does not decode the signature, compare a signature, check factory
+// metadata, or check token times. A successful result is therefore untrusted
+// and IsValid returns false until Factory.Validate succeeds. Any framing,
+// header, or payload error returns a nil Token and an error matching
+// ErrBadToken. Callers should normally use Factory.Parse instead.
 func Decode(data string) (*Token, error) {
 	sections := strings.Split(data, ".")
 	if len(sections) != 3 || len(sections[0]) == 0 || len(sections[1]) == 0 || len(sections[2]) == 0 {

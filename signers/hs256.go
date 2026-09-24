@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-// Package signers implements jsonwt.Signer types.
+// Package signers provides the built-in jsonwt.Signer implementation.
 package signers
 
 import (
@@ -29,13 +29,16 @@ import (
 	"crypto/sha256"
 )
 
-// HS256 implements the jsonwt.Signer interface using HMAC256.
+// HS256 implements jsonwt.Signer with HMAC-SHA-256 and reports the algorithm
+// identifier "HS256". It is safe to reuse after construction. Its methods
+// require the non-nil *HS256 returned by NewHS256.
 type HS256 struct {
 	key []byte
 }
 
-// NewHS256 returns a new HMAC256 signer. It returns ErrEmptySecret if secret is
-// empty.
+// NewHS256 returns an HS256 signer containing its own copy of secret. A nil or
+// empty secret returns nil, ErrEmptySecret. Callers must protect the secret;
+// the signer provides no key storage or rotation.
 func NewHS256(secret []byte) (*HS256, error) {
 	if len(secret) == 0 {
 		return nil, ErrEmptySecret
@@ -45,14 +48,12 @@ func NewHS256(secret []byte) (*HS256, error) {
 	return &s, nil
 }
 
-// Algorithm implements the jsonwt.Signer interface.
-// It returns the "name" of the algorithm used for signing messages.
+// Algorithm returns "HS256".
 func (s *HS256) Algorithm() string {
 	return "HS256"
 }
 
-// Sign implements the jsonwt.Signer interface.
-// It returns a slice of bytes containing the signature for the message.
+// Sign returns the HMAC-SHA-256 digest of msg using the signer's copied secret.
 func (s *HS256) Sign(msg []byte) ([]byte, error) {
 	hm := hmac.New(sha256.New, s.key)
 	if _, err := hm.Write(msg); err != nil {

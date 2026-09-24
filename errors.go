@@ -23,21 +23,25 @@ SOFTWARE.
 
 package jsonwt
 
-// Error is a constant error value.
+// Error is a comparable constant error value. Package sentinel errors can be
+// tested with errors.Is, including when an operation adds context by wrapping.
 type Error string
 
 // Error returns the error message.
 func (e Error) Error() string { return string(e) }
 
 const (
-	// ErrBadFactory indicates that a factory is not configured correctly.
+	// ErrBadFactory indicates a nil Factory, empty factory key ID, or nil Signer.
 	ErrBadFactory = Error("bad factory")
-	// ErrBadToken indicates that a token is malformed.
+	// ErrBadToken indicates malformed compact framing, base64, JSON, or signature
+	// encoding. Claim returns ErrBadToken for a nil Token.
 	ErrBadToken = Error("bad token")
-	// ErrInvalid indicates that a token is invalid.
+	// ErrInvalid indicates an invalid requested lifetime, a nil Token passed to
+	// Sign or Validate, or a token that is unsigned, not yet active, expired, or
+	// missing its required iat or exp time.
 	ErrInvalid = Error("invalid token")
-	// ErrMissingClaim indicates that a required claim is absent.
+	// ErrMissingClaim indicates that a valid Token has no application claim.
 	ErrMissingClaim = Error("missing claim")
-	// ErrUnauthorized indicates that token authorization failed.
+	// ErrUnauthorized indicates an algorithm, key ID, or signature mismatch.
 	ErrUnauthorized = Error("unauthorized")
 )

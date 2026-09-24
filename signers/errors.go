@@ -23,13 +23,14 @@ SOFTWARE.
 
 package signers
 
-// Error is a constant error value.
+// Error is a comparable constant error value. Package sentinel errors can be
+// tested with errors.Is.
 type Error string
 
 // Error returns the error message.
 func (e Error) Error() string { return string(e) }
 
 const (
-	// ErrEmptySecret indicates that an HS256 secret is empty.
+	// ErrEmptySecret indicates that NewHS256 received a nil or empty secret.
 	ErrEmptySecret = Error("empty secret")
 )
