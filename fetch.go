@@ -29,51 +29,44 @@ import (
 )
 
 // FromBearerToken returns the Token from the Authorization header.
-// If there is no bearer token or if the token is invalid for any reason, it returns nil.
+// The Bearer scheme is matched case-insensitively. The token is decoded but
+// not verified; callers must validate it before use. If the header is missing
+// or malformed, FromBearerToken returns nil.
 func FromBearerToken(r *http.Request) *Token {
-	//log.Printf("jsonwt: bearer: entered\n")
-	headerAuthText := r.Header.Get("Authorization")
-	if headerAuthText == "" {
-		return nil
-	}
-	//log.Printf("jsonwt: bearer: found authorization header\n")
-	authTokens := strings.SplitN(headerAuthText, " ", 2)
+	authTokens := strings.Fields(r.Header.Get("Authorization"))
 	if len(authTokens) != 2 {
 		return nil
 	}
-	//log.Printf("jsonwt: bearer: found authorization token\n")
-	authType, authToken := authTokens[0], strings.TrimSpace(authTokens[1])
-	if authType != "Bearer" {
+	authType, authToken := authTokens[0], authTokens[1]
+	if !strings.EqualFold(authType, "Bearer") {
 		return nil
 	}
-	//log.Printf("jsonwt: bearer: found bearer token\n")
 	j, err := Decode(authToken)
 	if err != nil {
-		//log.Printf("jsonwt: bearer: token: %+v\n", err)
 		return nil
 	}
-	//log.Printf("jsonwt: bearer: returning bearer token\n")
 	return j
 }
 
+// FromCookie returns the Token stored in the package cookie. The token is
+// decoded but not verified; callers must validate it before use. If the cookie
+// is missing or malformed, FromCookie returns nil.
 func FromCookie(r *http.Request) *Token {
-	//log.Printf("jsonwt: cookie: entered\n")
-	c, err := r.Cookie("jwt")
+	c, err := r.Cookie(cookieName)
 	if err != nil {
-		//log.Printf("jsonwt: cookie: %+v\n", err)
 		return nil
 	}
 	t, err := Decode(c.Value)
 	if err != nil {
-		//log.Printf("jsonwt: cookie: token: %+v\n", err)
 		return nil
 	}
 	return t
 }
 
-// FromRequest will pull a Token from a request header.
-// It looks for a bearer token first.
-// If it can't find one, it looks for a cookie.
+// FromRequest returns a decoded Token from r. A valid bearer token takes
+// precedence over the package cookie. If the bearer header is absent or
+// malformed, FromRequest falls back to the cookie. Callers must validate the
+// returned token before use.
 func FromRequest(r *http.Request) *Token {
 	t := FromBearerToken(r)
 	if t == nil {

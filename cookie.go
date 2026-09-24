@@ -28,31 +28,42 @@ import (
 	"time"
 )
 
-// DeleteCookie is a helper function to delete a Cookie that may contain the Token.
+const cookieName = "jsonwt"
+
+// DeleteCookie removes the package cookie from the client.
 func DeleteCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "jsonwt",
+		Name:     cookieName,
 		Path:     "/",
+		Expires:  time.Unix(1, 0).UTC(),
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
 }
 
-// SetCookie is a helper function to create a Cookie containing the Token.
+// SetCookie sends the Token to the client in the package cookie. The cookie
+// expires no later than the Token. A nil or already-expired Token deletes the
+// cookie.
 func SetCookie(w http.ResponseWriter, t *Token) {
-	var maxAge int
-	if t.p.ExpirationTime != 0 {
-		maxAge = int(time.Unix(t.p.ExpirationTime, 0).Sub(time.Now().UTC()).Seconds())
+	setCookie(w, t, time.Now().UTC())
+}
+
+func setCookie(w http.ResponseWriter, t *Token, now time.Time) {
+	if t == nil || t.p.ExpirationTime <= now.Unix() {
+		DeleteCookie(w)
+		return
 	}
-	if maxAge < 15 {
-		maxAge = 15
-	} else if maxAge > 14*24*60*60 {
-		maxAge = 14 * 24 * 60 * 60
+	expires := time.Unix(t.p.ExpirationTime, 0).UTC()
+	maxAge := int(expires.Sub(now) / time.Second)
+	if maxAge <= 0 {
+		DeleteCookie(w)
+		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     "jsonwt",
+		Name:     cookieName,
 		Path:     "/",
 		Value:    t.String(),
+		Expires:  expires,
 		MaxAge:   maxAge,
 		HttpOnly: true,
 	})

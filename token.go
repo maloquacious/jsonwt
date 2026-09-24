@@ -57,7 +57,7 @@ func (t *Token) isValidAt(now time.Time) bool {
 	return true
 }
 
-// DeleteCookie removes the cookie associated with the Token.
+// DeleteCookie removes the package cookie associated with the Token.
 func (t *Token) DeleteCookie(w http.ResponseWriter) {
 	DeleteCookie(w)
 }
@@ -72,7 +72,9 @@ func (t *Token) Payload() string {
 	return t.p.b64
 }
 
-// SetCookie associates a cookie with the Token and sends it to the client.
+// SetCookie sends the Token to the client in the package cookie. The cookie
+// expires no later than the Token. A nil or already-expired Token deletes the
+// cookie.
 func (t *Token) SetCookie(w http.ResponseWriter) {
 	SetCookie(w, t)
 }
