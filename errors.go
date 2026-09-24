@@ -23,18 +23,21 @@ SOFTWARE.
 
 package jsonwt
 
-import "errors"
+// Error is a constant error value.
+type Error string
 
-var ErrBadFactory = errors.New("bad factory")
-var ErrBadToken = errors.New("bad token")
-var ErrInvalid = errors.New("invalid token")
-var ErrMissingClaim = errors.New("missing claim")
-var ErrUnauthorized = errors.New("unauthorized")
+// Error returns the error message.
+func (e Error) Error() string { return string(e) }
 
-//var ErrBadRequest = errors.New("bad request")
-//var ErrExpired = errors.New("expired")
-//var ErrInvalidSignature = errors.New("invalid signature")
-//var ErrMissingAuthHeader = errors.New("missing auth header")
-//var ErrMissingSigner = errors.New("missing signer")
-//var ErrNotBearer = errors.New("not a bearer token")
-//var ErrNotMyKID = errors.New("not my kid")
+const (
+	// ErrBadFactory indicates that a factory is not configured correctly.
+	ErrBadFactory = Error("bad factory")
+	// ErrBadToken indicates that a token is malformed.
+	ErrBadToken = Error("bad token")
+	// ErrInvalid indicates that a token is invalid.
+	ErrInvalid = Error("invalid token")
+	// ErrMissingClaim indicates that a required claim is absent.
+	ErrMissingClaim = Error("missing claim")
+	// ErrUnauthorized indicates that token authorization failed.
+	ErrUnauthorized = Error("unauthorized")
+)
