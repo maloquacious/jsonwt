@@ -24,6 +24,7 @@ SOFTWARE.
 package jsonwt
 
 import (
+	"crypto/hmac"
 	"encoding/json"
 	"time"
 )
@@ -31,6 +32,7 @@ import (
 // NewFactory returns an initialized factory.
 // The signer is used to sign the generated tokens.
 // Factories are cheap, so create a new one to rotate keys.
+// Factory operations return ErrBadFactory if kid is empty or s is nil.
 func NewFactory(kid string, s Signer) *Factory {
 	return &Factory{kid: kid, s: s}
 }
@@ -45,18 +47,33 @@ func (f *Factory) ID() string {
 	return f.kid
 }
 
+// Parse decodes data and validates its factory metadata, signature, and
+// lifetime. A successful Parse returns a token that is safe to inspect and use.
+// Malformed data returns ErrBadToken, metadata or signature mismatches return
+// ErrUnauthorized, and invalid token lifetimes return ErrInvalid.
+func (f *Factory) Parse(data string) (*Token, error) {
+	t, err := Decode(data)
+	if err != nil {
+		return nil, err
+	}
+	if err = f.Validate(t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 // Sign will sign a Token.
 // It uses the current values in the header and payload, so it is safe to call multiple times.
 // It updates the Token's Algorithm field to match the factory's signer's algorithm.
 // It updates the Token's KeyID field to match the factory's key id.
 func (f *Factory) Sign(t *Token) error {
-	t.isSigned = false // unset the signed flag, just to be safe
-
 	if f == nil || f.kid == "" || f.s == nil {
 		return ErrBadFactory
 	} else if t == nil {
 		return ErrInvalid
 	}
+
+	t.isSigned = false // unset the signed flag, just to be safe
 
 	t.h.Algorithm = f.s.Algorithm()
 	t.h.KeyID = f.kid
@@ -106,8 +123,10 @@ func (f *Factory) Token(ttl time.Duration, claim interface{}) (*Token, error) {
 	return t, nil
 }
 
-// Validate will return an error if the Token is not properly signed.
-// It tries to update the isSigned to true only if the Token is properly signed.
+// Validate verifies the Token's factory metadata, signature, and lifetime.
+// It marks the Token as signed only when its signature is valid. A nil Token
+// or invalid lifetime returns ErrInvalid, and a malformed signature returns
+// ErrBadToken.
 func (f *Factory) Validate(t *Token) error {
 	if t == nil {
 		return ErrInvalid
@@ -118,16 +137,27 @@ func (f *Factory) Validate(t *Token) error {
 	if f == nil || f.kid == "" || f.s == nil {
 		return ErrBadFactory
 	}
+	if t.h.Algorithm != f.s.Algorithm() || t.h.KeyID != f.kid {
+		return ErrUnauthorized
+	}
+
+	signature, err := decode(t.s)
+	if err != nil {
+		return ErrBadToken
+	}
 
 	expectedSignature, err := f.s.Sign([]byte(t.h.b64 + "." + t.p.b64))
 	if err != nil {
 		return err
 	}
 
-	t.isSigned = t.s == encode(expectedSignature)
+	t.isSigned = hmac.Equal(signature, expectedSignature)
 	if !t.isSigned {
 		return ErrUnauthorized
 	}
+	if !t.IsValid() {
+		return ErrInvalid
+	}
 
-	return nil // valid signature
+	return nil
 }

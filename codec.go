@@ -26,10 +26,12 @@ package jsonwt
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
-// Decode expects the data to look like header.payload.signature if it is a valid Token
+// Decode decodes a token in header.payload.signature form. It does not verify
+// the token; callers should normally use Factory.Parse instead.
 func Decode(data string) (*Token, error) {
 	sections := strings.Split(data, ".")
 	if len(sections) != 3 || len(sections[0]) == 0 || len(sections[1]) == 0 || len(sections[2]) == 0 {
@@ -43,16 +45,16 @@ func Decode(data string) (*Token, error) {
 
 	// the header is base64 encoded JSON
 	if rawHeader, err := decode(t.h.b64); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: header: %v", ErrBadToken, err)
 	} else if err = json.Unmarshal(rawHeader, &t.h); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: header: %v", ErrBadToken, err)
 	}
 
 	// the payload is base64 encoded JSON
 	if rawPayload, err := decode(t.p.b64); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: payload: %v", ErrBadToken, err)
 	} else if err = json.Unmarshal(rawPayload, &t.p); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: payload: %v", ErrBadToken, err)
 	}
 
 	return &t, nil

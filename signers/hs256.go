@@ -34,8 +34,12 @@ type HS256 struct {
 	key []byte
 }
 
-// NewHS256 returns a new HMAC256 signer.
+// NewHS256 returns a new HMAC256 signer. It returns ErrEmptySecret if secret is
+// empty.
 func NewHS256(secret []byte) (*HS256, error) {
+	if len(secret) == 0 {
+		return nil, ErrEmptySecret
+	}
 	s := HS256{key: make([]byte, len(secret))}
 	copy(s.key, secret)
 	return &s, nil
