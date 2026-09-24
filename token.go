@@ -36,10 +36,14 @@ import (
 // exp boundary is exclusive: now < exp. A zero nbf imposes no additional
 // boundary.
 func (t *Token) IsValid() bool {
+	return t.isValidAt(t.now())
+}
+
+func (t *Token) now() time.Time {
 	if t != nil && t.clock != nil {
-		return t.isValidAt(t.clock.Now().UTC())
+		return t.clock.Now().UTC()
 	}
-	return t.isValidAt(time.Now().UTC())
+	return time.Now().UTC()
 }
 
 func (t *Token) isValidAt(now time.Time) bool {

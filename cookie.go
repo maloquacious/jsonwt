@@ -46,14 +46,15 @@ func DeleteCookie(w http.ResponseWriter) {
 
 // SetCookie writes t in a cookie named "jsonwt". For a usable future exp, the
 // cookie has Path "/", Value t.String(), Expires equal to exp, HttpOnly true,
-// and MaxAge equal to the whole seconds remaining at call time. Domain, Secure,
-// and SameSite retain their net/http zero values.
+// and MaxAge equal to the whole seconds remaining at call time. It uses the
+// Factory clock associated with t, or the system clock when t has no associated
+// clock. Domain, Secure, and SameSite retain their net/http zero values.
 //
 // SetCookie writes the deletion cookie described by DeleteCookie when t is nil,
 // exp is missing or elapsed, or less than one whole second remains. It does not
 // otherwise validate t. w must be non-nil.
 func SetCookie(w http.ResponseWriter, t *Token) {
-	setCookie(w, t, time.Now().UTC())
+	setCookie(w, t, t.now())
 }
 
 func setCookie(w http.ResponseWriter, t *Token, now time.Time) {

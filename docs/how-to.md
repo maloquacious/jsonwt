@@ -168,9 +168,13 @@ fmt.Println(cookie.Name, cookie.HttpOnly, deleted.MaxAge)
 ```
 
 The result is `jsonwt true -1`. The set cookie is scoped to `/` and expires no
-later than the token. Deletion writes the same cookie with a negative `MaxAge`.
-`FromCookie`, like the bearer helper, only decodes; validate before use. See
-the [`SetCookie`, `FromCookie`, and `DeleteCookie`
+later than the token. Its `MaxAge` is calculated with the same factory clock
+retained by the token, so a clock supplied through `NewFactoryWithClock` also
+makes cookie timing deterministic. Tokens without an associated factory clock
+use the system clock. `Token.SetCookie` and package-level `SetCookie` have the
+same timing behavior. Deletion writes the same cookie with a negative
+`MaxAge`. `FromCookie`, like the bearer helper, only decodes; validate before
+use. See the [`SetCookie`, `FromCookie`, and `DeleteCookie`
 reference](https://pkg.go.dev/github.com/mdhender/jsonwt#SetCookie) and the
 [security boundaries](security.md).
 

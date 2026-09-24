@@ -117,32 +117,81 @@ func TestCookieRoundTrip(t *testing.T) {
 }
 
 func TestSetCookieExpiration(t *testing.T) {
+	clock := &testClock{now: time.Unix(100, 0)}
+	f := NewFactoryWithClock("key-1", testSigner("secret"), clock)
+	issued, err := f.Token(time.Minute, nil)
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	missingExpiration := &Token{clock: clock}
+
 	tests := []struct {
 		name       string
 		token      *Token
 		now        time.Time
 		wantMaxAge int
 	}{
-		{name: "future expiration", token: tokenExpiringAt(160), now: time.Unix(100, 0), wantMaxAge: 60},
-		{name: "less than one second remaining", token: tokenExpiringAt(101), now: time.Unix(100, 500_000_000), wantMaxAge: -1},
-		{name: "at expiration", token: tokenExpiringAt(100), now: time.Unix(100, 0), wantMaxAge: -1},
-		{name: "after expiration", token: tokenExpiringAt(99), now: time.Unix(100, 0), wantMaxAge: -1},
-		{name: "missing expiration", token: &Token{}, now: time.Unix(100, 0), wantMaxAge: -1},
+		{name: "future expiration", token: issued, now: time.Unix(100, 0), wantMaxAge: 60},
+		{name: "less than one second remaining", token: issued, now: time.Unix(159, 500_000_000), wantMaxAge: -1},
+		{name: "at expiration", token: issued, now: time.Unix(160, 0), wantMaxAge: -1},
+		{name: "after expiration", token: issued, now: time.Unix(161, 0), wantMaxAge: -1},
+		{name: "missing expiration", token: missingExpiration, now: time.Unix(100, 0), wantMaxAge: -1},
 		{name: "nil token", token: nil, now: time.Unix(100, 0), wantMaxAge: -1},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			setCookie(w, tt.token, tt.now)
-			cookies := w.Result().Cookies()
-			if len(cookies) != 1 {
-				t.Fatalf("setCookie() wrote %d cookies, want 1", len(cookies))
+			clock.now = tt.now
+
+			packageResponse := httptest.NewRecorder()
+			SetCookie(packageResponse, tt.token)
+			methodResponse := httptest.NewRecorder()
+			tt.token.SetCookie(methodResponse)
+			if got, want := methodResponse.Header().Get("Set-Cookie"), packageResponse.Header().Get("Set-Cookie"); got != want {
+				t.Errorf("Token.SetCookie header = %q, want package SetCookie header %q", got, want)
 			}
-			if got := cookies[0].MaxAge; got != tt.wantMaxAge {
-				t.Errorf("setCookie() MaxAge = %d, want %d", got, tt.wantMaxAge)
+
+			cookies := packageResponse.Result().Cookies()
+			if len(cookies) != 1 {
+				t.Fatalf("SetCookie() wrote %d cookies, want 1", len(cookies))
+			}
+			cookie := cookies[0]
+			if got := cookie.MaxAge; got != tt.wantMaxAge {
+				t.Errorf("SetCookie() MaxAge = %d, want %d", got, tt.wantMaxAge)
+			}
+			if cookie.Name != cookieName || cookie.Path != "/" || !cookie.HttpOnly {
+				t.Errorf("SetCookie() attributes = %+v, want named, root-scoped HttpOnly cookie", cookie)
+			}
+			if tt.wantMaxAge > 0 {
+				if got, want := cookie.Expires.Unix(), int64(160); got != want {
+					t.Errorf("SetCookie() Expires = %d, want %d", got, want)
+				}
+				if cookie.Value != issued.String() {
+					t.Errorf("SetCookie() Value = %q, want %q", cookie.Value, issued.String())
+				}
+			} else if cookie.Value != "" || cookie.Expires.Unix() != 1 {
+				t.Errorf("SetCookie() deletion attributes = %+v, want empty value expiring at Unix second 1", cookie)
 			}
 		})
+	}
+}
+
+func TestSetCookieUsesSystemClockWithoutAssociatedClock(t *testing.T) {
+	expiration := time.Now().Add(time.Hour).Unix()
+	token := tokenExpiringAt(expiration)
+	w := httptest.NewRecorder()
+	SetCookie(w, token)
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("SetCookie() wrote %d cookies, want 1", len(cookies))
+	}
+	cookie := cookies[0]
+	if cookie.MaxAge <= 0 || cookie.MaxAge > int(time.Hour/time.Second) {
+		t.Errorf("SetCookie() MaxAge = %d, want positive and at most %d", cookie.MaxAge, int(time.Hour/time.Second))
+	}
+	if got := cookie.Expires.Unix(); got != expiration {
+		t.Errorf("SetCookie() Expires = %d, want %d", got, expiration)
 	}
 }
 
