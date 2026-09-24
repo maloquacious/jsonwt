@@ -30,7 +30,7 @@ token, and extract the claim.
 ## Documentation
 
 - [Tutorial and user manual](docs/tutorial.md)
-- [How-to guides](https://github.com/maloquacious/jsonwt/issues/7) (planned for v1)
+- [How-to guides](docs/how-to.md)
 - [API reference](https://pkg.go.dev/github.com/mdhender/jsonwt)
 - [Security and design explanation](docs/security.md)
 
